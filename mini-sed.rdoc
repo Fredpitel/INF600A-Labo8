@@ -1,0 +1,5 @@
+= mini-sed
+
+Generate this with
+    mini-sed rdoc
+After you have described your command line interface

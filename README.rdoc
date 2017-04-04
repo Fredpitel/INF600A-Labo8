@@ -1,0 +1,6 @@
+= mini-sed
+
+Describe your project here
+
+:include:mini-sed.rdoc
+

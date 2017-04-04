@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+require 'gli'
+require 'fileutils'
+begin # XXX: Remove this begin/rescue before distributing your app
+  require 'mini-sed'
+rescue LoadError
+  STDERR.puts "In development, you need to use `bundle exec bin/mini-sed` to run your app"
+  STDERR.puts "At install-time, RubyGems will make sure lib, etc. are in the load path"
+  STDERR.puts "Feel free to remove this message from bin/mini-sed now"
+  exit 64
+end
+
+include GLI::App
+
+program_desc 'Programme qui emule sed (de facon simplifiee)'
+
+version MiniSed::VERSION
+
+# Use argument validation
+arguments :strict
+
+desc 'Execute en modifiant directement le fichier traite'
+arg_name 'extension'
+flag [:i,:"in-place"]
+
+desc "Substitue un motif par une chaine dans les lignes qui matchent"
+arg_name 'motif chaine [fichier...]'
+command :substitute do |c|
+  c.desc 'Substitution globale'
+  c.switch :g
+
+  c.action do |global_options,options,args|
+    ext_in_place = global_options[:"in-place"]
+    global = 'g' if options[:g]
+    motif = args.shift
+    chaine = args.shift
+
+    fichiers = args.empty? ? [:stdin] : args
+    fichiers.each do |nom_fichier|
+      if nom_fichier == :stdin
+        flux_in = $stdin
+        flux_out = $stdout
+      elsif ext_in_place.nil?
+        flux_in = File.open(nom_fichier)
+        flux_out = $stdout
+      else
+        ext_in_place = "#{$$}" if ext_in_place.empty?
+        nom_copie = "#{nom_fichier}#{ext_in_place}"
+        FileUtils.mv nom_fichier, nom_copie, force: true
+
+        flux_in = File.open( nom_copie )
+        flux_out = File.open( nom_fichier, "w" )  # Le fichier source qu'on modifie.
+      end
+
+      MiniSed.substitute( flux_in, motif, chaine, global ).each do |ligne|
+        flux_out.puts ligne
+      end
+
+      FileUtils.rm_f nom_copie if nom_copie && ext_in_place == "#{$$}"
+      flux_out.close if flux_out != $stdout
+    end
+  end
+end
+
+desc 'Supprime les lignes qui matchent un motif'
+arg_name 'motif [fichier...]'
+command :delete do |c|
+  c.action do |global_options,options,args|
+    ext_in_place = global_options[:"in-place"]
+    motif = args.shift
+
+    # A COMPLETER/MODIFIER.
+    puts "sed #{ext_in_place}'/#{motif}/d' #{args.join(' ')}"
+  end
+end
+
+desc 'Imprime les lignes qui matchent un motif'
+arg_name 'motif [fichier...]'
+command :print do |c|
+  c.action do |global_options,options,args|
+    ext_in_place = global_options[:"in-place"]
+    motif = args.shift
+
+    # A COMPLETER/MODIFIER.
+    puts "sed #{ext_in_place}'/#{motif}/p' #{args.join(' ')}"
+  end
+end
+
+
+pre do |global,command,options,args|
+  # Pre logic here
+  # Return true to proceed; false to abort and not call the
+  # chosen command
+  # Use skips_pre before a command to skip this block
+  # on that command only
+  true
+end
+
+post do |global,command,options,args|
+  # Post logic here
+  # Use skips_post before a command to skip this
+  # block on that command only
+end
+
+on_error do |exception|
+  # Error logic here
+  # return false to skip default error handling
+
+  STDERR.puts "*** Oops! Exception signalee dans mini-sed!!"
+  STDERR.puts "exception = #{exception.inspect}"
+  STDERR.puts exception.backtrace
+
+  false
+end
+
+exit run(ARGV)
